@@ -6,11 +6,12 @@ import json
 import pyrebase
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QTableWidget , QTableWidgetItem,
-    QHeaderView, QPushButton, QDialogButtonBox, QMessageBox)
+    QHeaderView, QPushButton, QDialogButtonBox, QMessageBox, QDateTimeEdit  )
 
-from PyQt6.QtGui import QIcon, QPixmap, QImage
+from PyQt6.QtGui import QIcon, QPixmap, QImage, QDoubleValidator
 from PyQt6.QtCore import Qt
-from AquariumDialog import SignInDialog
+
+from AquariumDialog import SignInDialog, UploadDataDialog
 
 class AquariumLog(QMainWindow):
 
@@ -27,23 +28,26 @@ class AquariumLog(QMainWindow):
         self.sign_in_btn.clicked.connect(self.open_signin_dialog)
         self.sign_out_btn = QPushButton('Sign Out')
         self.sign_out_btn.setFixedHeight(60)
-        self.sign_out_btn.setVisible(False)
+        #self.sign_out_btn.setVisible(False)
         self.sign_out_btn.clicked.connect(self.disconnect_firebase)
         self.upload_photo_btn = QPushButton('Upload Photos')
         self.upload_photo_btn.setFixedHeight(60)
-        self.upload_photo_btn.setDisabled(True)
+        #self.upload_photo_btn.setDisabled(True)
         self.display_graphics_btn = QPushButton('Display Graphics')
         self.display_graphics_btn.setFixedHeight(60)
         self.display_graphics_btn.setDisabled(True)
         self.upload_data_btn = QPushButton('Upload Data')
         self.upload_data_btn.setFixedHeight(60)
-        self.upload_data_btn.setDisabled(True)
+        #self.upload_data_btn.setDisabled(True)
+        self.upload_data_btn.clicked.connect(self.open_upload_data_dialog)
         # Load ui
         self.init_dashboard_ui()
         # Load config
         self.load_config()
         # Init firebase
         self.init_firebase()
+        # Users
+        self.user = {}
 
     def init_dashboard_ui(self):
         dashboard_layout = QVBoxLayout()
@@ -118,23 +122,25 @@ class AquariumLog(QMainWindow):
         if email != '' and password != '':
             auth = self.firebase.auth()
             try:
-                user = auth.sign_in_with_email_and_password(email, password)
+                self.user = auth.sign_in_with_email_and_password(email, password)
                 self.sign_in_btn.setDisabled(True)
-                self.upload_photo_btn.setDisabled(False)
-                self.display_graphics_btn.setDisabled(False)
-                self.upload_data_btn.setDisabled(False)
-                self.sign_in_btn.setVisible(False)
-                self.sign_out_btn.setVisible(True)
+                # self.upload_photo_btn.setDisabled(False)
+                # self.display_graphics_btn.setDisabled(False)
+                # self.upload_data_btn.setDisabled(False)
+                # self.sign_in_btn.setVisible(False)
+                # self.sign_out_btn.setVisible(True)
             except requests.exceptions.HTTPError as error:
                 msg = self.error_handler(error)
                 self.display_error(msg)
         else:
             self.display_error('Password and email is empty')
+
     def error_handler(self, error):
         msg = json.loads(error.args[1])['error']['message']
         errors = {
             'INVALID_EMAIL' : 'Invalid email address',
-            'INVALID_PASSWORD': 'Invalid password'
+            'INVALID_PASSWORD': 'Invalid password',
+            'EMAIL_NOT_FOUND': 'Email not found'
         }
         return errors[msg]
 
@@ -155,6 +161,37 @@ class AquariumLog(QMainWindow):
         self.display_graphics_btn.setDisabled(True)
         self.upload_data_btn.setDisabled(True)
         self.open_signin_dialog()
+
+    def open_upload_data_dialog(self):
+        upload_data_dialog = UploadDataDialog()
+        if upload_data_dialog.exec():
+            userid = self.user['localId']
+            date = upload_data_dialog.date_input.text()
+            ph = upload_data_dialog.input_sg.text()
+            sg = upload_data_dialog.input_sg.text()
+            no = upload_data_dialog.input_no.text()
+            po = upload_data_dialog.input_po.text()
+            kh = upload_data_dialog.input_kh.text()
+            ca = upload_data_dialog.input_ca.text()
+            mg = upload_data_dialog.input_mg.text()
+            self.insert_data_aquarium(userid, date, ph, sg, no, po, kh, ca, mg)
+
+    def insert_data_aquarium(self, userid, date, ph, sg, no, po, kh, ca, mg):
+        db = self.firebase.database()
+        print(self.user)
+        try:
+            db.child('users').child(userid).child('data').push({
+                "date": date,
+                "ph": ph,
+                "sg": sg,
+                "no": no,
+                "po": po,
+                "kh": kh,
+                "ca": ca,
+                "mg": mg
+            })
+        except Exception as e:
+            print(e)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
