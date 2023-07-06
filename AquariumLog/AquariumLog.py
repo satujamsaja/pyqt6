@@ -6,7 +6,7 @@ import json
 import pyrebase
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QTableWidget , QTableWidgetItem,
-    QHeaderView, QPushButton, QDialogButtonBox, QMessageBox, QDateTimeEdit  )
+    QHeaderView, QPushButton, QDialogButtonBox, QMessageBox, QDateTimeEdit, QAbstractItemView  )
 
 from PyQt6.QtGui import QIcon, QPixmap, QImage, QDoubleValidator
 from PyQt6.QtCore import Qt
@@ -40,6 +40,11 @@ class AquariumLog(QMainWindow):
         self.upload_data_btn.setFixedHeight(60)
         #self.upload_data_btn.setDisabled(True)
         self.upload_data_btn.clicked.connect(self.open_upload_data_dialog)
+        # Init datatable
+        self.log_table = QTableWidget(1, 8)
+        self.log_table_header = self.log_table.horizontalHeader()
+        self.log_table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.log_table.setHorizontalHeaderLabels(["Date", "pH", "Sg", "NO3", "PO4", "KH", "CA", "MG"])
         # Load ui
         self.init_dashboard_ui()
         # Load config
@@ -66,20 +71,8 @@ class AquariumLog(QMainWindow):
         dashboard_log_groupbox.setFixedHeight(200)
         dashboard_log_groupbox.setFixedWidth(875)
         dashboard_log_layout = QVBoxLayout()
-        # Tank log table
-        log_table = QTableWidget(1, 8)
-        log_table_header = log_table.horizontalHeader()
-        log_table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        log_table.setHorizontalHeaderLabels(["Date", "pH", "Sg", "NO3", "PO4", "KH", "CA", "MG"])
-        log_table.setItem(0, 0, QTableWidgetItem("08 June 2023, 10:00 PM"))
-        log_table.setItem(0, 1, QTableWidgetItem("8.3"))
-        log_table.setItem(0, 2, QTableWidgetItem("1.025"))
-        log_table.setItem(0, 3, QTableWidgetItem("2"))
-        log_table.setItem(0, 4, QTableWidgetItem("0.03"))
-        log_table.setItem(0, 5, QTableWidgetItem("8.5"))
-        log_table.setItem(0, 6, QTableWidgetItem("400"))
-        log_table.setItem(0, 7, QTableWidgetItem("1300"))
-        dashboard_log_layout.addWidget(log_table)
+        # Add table to layout
+        dashboard_log_layout.addWidget(self.log_table)
         dashboard_log_groupbox.setLayout(dashboard_log_layout)
         # Tank operation container
         dashboard_operation_groupbox = QGroupBox('Menu')
@@ -129,6 +122,7 @@ class AquariumLog(QMainWindow):
                 # self.upload_data_btn.setDisabled(False)
                 # self.sign_in_btn.setVisible(False)
                 # self.sign_out_btn.setVisible(True)
+                self.load_data_aquarium(self.user['localId'])
             except requests.exceptions.HTTPError as error:
                 msg = self.error_handler(error)
                 self.display_error(msg)
@@ -178,7 +172,6 @@ class AquariumLog(QMainWindow):
 
     def insert_data_aquarium(self, userid, date, ph, sg, no, po, kh, ca, mg):
         db = self.firebase.database()
-        print(self.user)
         try:
             db.child('users').child(userid).child('data').push({
                 "date": date,
@@ -190,6 +183,29 @@ class AquariumLog(QMainWindow):
                 "ca": ca,
                 "mg": mg
             })
+            self.load_data_aquarium(userid)
+        except Exception as e:
+            print(e)
+
+    def load_data_aquarium(self, userid):
+        db = self.firebase.database()
+        try:
+            data = db.child('users').child(userid).child('data').get()
+            data_value = data.val()
+            self.log_table.setRowCount(len(data_value))
+            row = 0
+            for log in data_value:
+                log_data = data_value[log]
+                self.log_table.setItem(row, 0, QTableWidgetItem(log_data['date']))
+                self.log_table.setItem(row, 1, QTableWidgetItem(log_data['ph']))
+                self.log_table.setItem(row, 2, QTableWidgetItem(log_data['sg']))
+                self.log_table.setItem(row, 3, QTableWidgetItem(log_data['no']))
+                self.log_table.setItem(row, 4, QTableWidgetItem(log_data['po']))
+                self.log_table.setItem(row, 5, QTableWidgetItem(log_data['kh']))
+                self.log_table.setItem(row, 6, QTableWidgetItem(log_data['ca']))
+                self.log_table.setItem(row, 7, QTableWidgetItem(log_data['mg']))
+                row += 1
+
         except Exception as e:
             print(e)
 
