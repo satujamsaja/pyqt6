@@ -1,12 +1,16 @@
-from PyQt6.QtWidgets import QDialog, QLabel, QGroupBox, QDialogButtonBox, QLineEdit, QFormLayout, QVBoxLayout, QDateTimeEdit
+from PyQt6.QtWidgets import (
+    QDialog, QLabel, QGroupBox, QDialogButtonBox, QLineEdit, QFormLayout, QVBoxLayout, QDateTimeEdit, QPushButton, QFileDialog )
 from PyQt6.QtCore import Qt, QDateTime
 from PyQt6.QtGui import QDoubleValidator
+import os
 
 class SignInDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Log In")
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+        self.setFixedWidth(300)
+        self.setFixedHeight(165)
 
         # Input
         self.input_email = QLineEdit()
@@ -41,11 +45,14 @@ class UploadDataDialog(QDialog):
         super().__init__()
         self.setWindowTitle("Upload Aquarium Data")
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+        self.setFixedWidth(300)
+        self.setFixedHeight(350)
 
         # Date
         self.date_input = QDateTimeEdit()
         self.date_input.setDateTime(QDateTime.currentDateTime())
         self.date_input.setCalendarPopup(True)
+
         # Input
         self.validator = QDoubleValidator(0.0, 99.99, 2)
         self.input_ph = QLineEdit()
@@ -90,4 +97,3 @@ class UploadDataDialog(QDialog):
         upload_data_layout.addWidget(upload_data_group)
         upload_data_layout.addWidget(self.btn_add_data)
         self.setLayout(upload_data_layout)
-

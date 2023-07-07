@@ -3,10 +3,13 @@ import sys
 import requests.exceptions
 import yaml
 import json
+import os
+import time
 import pyrebase
+from urllib.parse import quote
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QTableWidget , QTableWidgetItem,
-    QHeaderView, QPushButton, QDialogButtonBox, QMessageBox, QDateTimeEdit, QAbstractItemView  )
+    QHeaderView, QPushButton, QDialogButtonBox, QMessageBox, QDateTimeEdit, QAbstractItemView, QFileDialog  )
 
 from PyQt6.QtGui import QIcon, QPixmap, QImage, QDoubleValidator
 from PyQt6.QtCore import Qt
@@ -28,23 +31,27 @@ class AquariumLog(QMainWindow):
         self.sign_in_btn.clicked.connect(self.open_signin_dialog)
         self.sign_out_btn = QPushButton('Sign Out')
         self.sign_out_btn.setFixedHeight(60)
-        #self.sign_out_btn.setVisible(False)
+        self.sign_out_btn.setVisible(False)
         self.sign_out_btn.clicked.connect(self.disconnect_firebase)
         self.upload_photo_btn = QPushButton('Upload Photos')
         self.upload_photo_btn.setFixedHeight(60)
-        #self.upload_photo_btn.setDisabled(True)
+        self.upload_photo_btn.clicked.connect(self.open_upload_photo_dialog)
+        self.upload_photo_btn.setDisabled(True)
         self.display_graphics_btn = QPushButton('Display Graphics')
         self.display_graphics_btn.setFixedHeight(60)
         self.display_graphics_btn.setDisabled(True)
         self.upload_data_btn = QPushButton('Upload Data')
         self.upload_data_btn.setFixedHeight(60)
-        #self.upload_data_btn.setDisabled(True)
+        self.upload_data_btn.setDisabled(True)
         self.upload_data_btn.clicked.connect(self.open_upload_data_dialog)
         # Init datatable
         self.log_table = QTableWidget(1, 8)
         self.log_table_header = self.log_table.horizontalHeader()
         self.log_table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.log_table.setHorizontalHeaderLabels(["Date", "pH", "Sg", "NO3", "PO4", "KH", "CA", "MG"])
+        # Labels
+        self.firebase_label = QLabel('Firebase: Disconnected')
+        self.upload_label = QLabel('Upload: No file uploaded')
         # Load ui
         self.init_dashboard_ui()
         # Load config
@@ -86,10 +93,18 @@ class AquariumLog(QMainWindow):
         dashboard_operation_layout.addWidget(self.display_graphics_btn)
         dashboard_operation_layout.addWidget(self.upload_data_btn)
         dashboard_operation_groupbox.setLayout(dashboard_operation_layout)
+        # Dashboard status
+        dashboard_status_groupbox = QGroupBox('Status')
+        dashboard_status_groupbox.setFixedHeight(75)
+        dashboard_status_layout = QHBoxLayout()
+        dashboard_status_layout.addWidget(self.firebase_label)
+        dashboard_status_layout.addWidget(self.upload_label)
+        dashboard_status_groupbox.setLayout(dashboard_status_layout)
         # layouts
         dashboard_layout.addWidget(dashboard_image_groupbox)
         dashboard_layout.addWidget(dashboard_log_groupbox)
         dashboard_layout.addWidget(dashboard_operation_groupbox)
+        dashboard_layout.addWidget(dashboard_status_groupbox)
 
         # Central widget
         central_widget = QWidget()
@@ -117,12 +132,14 @@ class AquariumLog(QMainWindow):
             try:
                 self.user = auth.sign_in_with_email_and_password(email, password)
                 self.sign_in_btn.setDisabled(True)
-                # self.upload_photo_btn.setDisabled(False)
-                # self.display_graphics_btn.setDisabled(False)
-                # self.upload_data_btn.setDisabled(False)
-                # self.sign_in_btn.setVisible(False)
-                # self.sign_out_btn.setVisible(True)
-                self.load_data_aquarium(self.user['localId'])
+                self.upload_photo_btn.setDisabled(False)
+                self.display_graphics_btn.setDisabled(False)
+                self.upload_data_btn.setDisabled(False)
+                self.sign_in_btn.setVisible(False)
+                self.sign_out_btn.setVisible(True)
+                self.firebase_label.setText('Firebase: Connected')
+                self.load_data_aquarium()
+                self.load_photo_aquarium()
             except requests.exceptions.HTTPError as error:
                 msg = self.error_handler(error)
                 self.display_error(msg)
@@ -146,6 +163,15 @@ class AquariumLog(QMainWindow):
 
         if msg_box.exec() == QMessageBox.StandardButton.Retry:
             self.open_signin_dialog()
+
+    def display_insert_message(self, msg):
+        msg_box = QMessageBox()
+        msg_box.setText(msg)
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Close)
+        msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
+
+        if msg_box.exec() == QMessageBox.StandardButton.Yes:
+            self.open_upload_data_dialog()
 
     def disconnect_firebase(self):
         self.sign_out_btn.setVisible(False)
@@ -184,11 +210,13 @@ class AquariumLog(QMainWindow):
                 "mg": mg
             })
             self.load_data_aquarium(userid)
+            self.display_insert_message('Insert data success. Enter another data?')
         except Exception as e:
             print(e)
 
-    def load_data_aquarium(self, userid):
+    def load_data_aquarium(self):
         db = self.firebase.database()
+        userid = self.user['localId']
         try:
             data = db.child('users').child(userid).child('data').get()
             data_value = data.val()
@@ -208,6 +236,31 @@ class AquariumLog(QMainWindow):
 
         except Exception as e:
             print(e)
+
+    def open_upload_photo_dialog(self):
+        paths, _ = QFileDialog.getOpenFileNames(self, 'Select image(s)', '', 'Images (*.png *.jpg *.jpeg)')
+        files = []
+        storage = self.firebase.storage()
+        userid = self.user['localId']
+        for path in paths:
+            if path != '':
+                filename = os.path.basename(path)
+                files.append(filename)
+                file, ext = os.path.splitext(filename)
+                timestamp = int(time.time())
+                storage.child('users').child(userid).child(file +  '-' + str(timestamp) + ext).put(path)
+
+        self.upload_label.setText('Upload: ' + ','.join(files))
+
+    def load_photo_aquarium(self):
+        storage = self.firebase.storage()
+        userid = self.user['localId']
+        photos = storage.child('users').child(userid).list_files()
+        for photo in photos:
+            path_encode = quote(photo.name)
+            print(path_encode)
+            url = self.config['storageBaseUrl'] + self.config['storageBucket'] + '/o/' + path_encode + '?alt=media'
+            print(url)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
