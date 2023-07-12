@@ -6,13 +6,14 @@ import json
 import os
 import time
 import pyrebase
+import requests
 from urllib.parse import quote
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QTableWidget , QTableWidgetItem,
     QHeaderView, QPushButton, QDialogButtonBox, QMessageBox, QDateTimeEdit, QAbstractItemView, QFileDialog  )
 
 from PyQt6.QtGui import QIcon, QPixmap, QImage, QDoubleValidator
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 
 from AquariumDialog import SignInDialog, UploadDataDialog
 
@@ -49,6 +50,11 @@ class AquariumLog(QMainWindow):
         self.log_table_header = self.log_table.horizontalHeader()
         self.log_table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.log_table.setHorizontalHeaderLabels(["Date", "pH", "Sg", "NO3", "PO4", "KH", "CA", "MG"])
+        # Init timer
+        self.timer = QTimer()
+        # Photo urls holder and slideshow
+        self.photo_urls = []
+        self.slide = 0
         # Labels
         self.firebase_label = QLabel('Firebase: Disconnected')
         self.upload_label = QLabel('Upload: No file uploaded')
@@ -67,10 +73,6 @@ class AquariumLog(QMainWindow):
         dashboard_image_groupbox = QGroupBox('Photo')
         # Tank photo image
         dashboard_image_tank_layout = QVBoxLayout()
-        # tank_image_container = QLabel('')
-        # tank_image = QImage('tank.jpeg')
-        # tank_image_pixmap = QPixmap.fromImage(tank_image.scaled(860,400))
-        # tank_image_container.setPixmap(tank_image_pixmap)
         dashboard_image_tank_layout.addWidget(self.tank_image_container)
         dashboard_image_groupbox.setLayout(dashboard_image_tank_layout)
         # Tank log container
@@ -180,6 +182,9 @@ class AquariumLog(QMainWindow):
         self.upload_photo_btn.setDisabled(True)
         self.display_graphics_btn.setDisabled(True)
         self.upload_data_btn.setDisabled(True)
+        self.user = []
+        self.timer.stop()
+        self.firebase_label.setText('Firebase: Disconnected')
         self.open_signin_dialog()
 
     def open_upload_data_dialog(self):
@@ -257,10 +262,29 @@ class AquariumLog(QMainWindow):
         userid = self.user['localId']
         photos = storage.child('users').child(userid).list_files()
         for photo in photos:
-            path_encode = quote(photo.name)
-            print(path_encode)
+            path_encode = photo.name.replace('/', '%2F')
             url = self.config['storageBaseUrl'] + self.config['storageBucket'] + '/o/' + path_encode + '?alt=media'
-            print(url)
+            self.photo_urls.append(url)
+
+        if self.photo_urls:
+            self.init_slideshow()
+
+    def display_slideshow(self):
+        if self.slide <= len(self.photo_urls):
+            photo_url = self.photo_urls[self.slide]
+            print(photo_url)
+            tank_image = QImage()
+            tank_image.loadFromData(requests.get(photo_url).content)
+            tank_image_pixmap = QPixmap.fromImage(tank_image.scaled(860,400))
+            self.tank_image_container.setPixmap(tank_image_pixmap)
+            if self.slide == len(self.photo_urls) -1:
+                self.slide = 0
+            else:
+                self.slide += 1
+
+    def init_slideshow(self):
+        self.timer.timeout.connect(self.display_slideshow)
+        self.timer.start(3000)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
