@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QIcon, QPixmap, QImage, QDoubleValidator
 from PyQt6.QtCore import Qt, QTimer
 
-from AquariumDialog import SignInDialog, UploadDataDialog
+from AquariumDialog import SignInDialog, UploadDataDialog, GraphDialog
 
 class AquariumLog(QMainWindow):
 
@@ -41,6 +41,7 @@ class AquariumLog(QMainWindow):
         self.display_graphics_btn = QPushButton('Display Graphics')
         self.display_graphics_btn.setFixedHeight(60)
         self.display_graphics_btn.setDisabled(True)
+        self.display_graphics_btn.clicked.connect(self.open_graph_dialog)
         self.upload_data_btn = QPushButton('Upload Data')
         self.upload_data_btn.setFixedHeight(60)
         self.upload_data_btn.setDisabled(True)
@@ -66,6 +67,8 @@ class AquariumLog(QMainWindow):
         self.load_config()
         # Init firebase
         self.init_firebase()
+        # Hold data
+        self.data = []
         # Users
         self.user = {}
 
@@ -194,7 +197,7 @@ class AquariumLog(QMainWindow):
         if upload_data_dialog.exec():
             userid = self.user['localId']
             date = upload_data_dialog.date_input.text()
-            ph = upload_data_dialog.input_sg.text()
+            ph = upload_data_dialog.input_ph.text()
             sg = upload_data_dialog.input_sg.text()
             no = upload_data_dialog.input_no.text()
             po = upload_data_dialog.input_po.text()
@@ -226,11 +229,11 @@ class AquariumLog(QMainWindow):
         userid = self.user['localId']
         try:
             data = db.child('users').child(userid).child('data').get()
-            data_value = data.val()
-            self.log_table.setRowCount(len(data_value))
+            self.data = data.val()
+            self.log_table.setRowCount(len(self.data))
             row = 0
-            for log in data_value:
-                log_data = data_value[log]
+            for log in self.data:
+                log_data = self.data[log]
                 self.log_table.setItem(row, 0, QTableWidgetItem(log_data['date']))
                 self.log_table.setItem(row, 1, QTableWidgetItem(log_data['ph']))
                 self.log_table.setItem(row, 2, QTableWidgetItem(log_data['sg']))
@@ -298,6 +301,12 @@ class AquariumLog(QMainWindow):
     def init_slideshow(self):
         self.timer.timeout.connect(self.display_slideshow)
         self.timer.start(3000)
+
+    def open_graph_dialog(self):
+        graph = GraphDialog(self.data)
+        if graph.exec():
+            print('called')
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
