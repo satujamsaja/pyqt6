@@ -55,6 +55,8 @@ class AquariumLog(QMainWindow):
         # Photo urls holder and slideshow
         self.photo_urls = []
         self.slide = 0
+        # Image directory to hold local photos
+        self.directory = 'images/'
         # Labels
         self.firebase_label = QLabel('Firebase: Disconnected')
         self.upload_label = QLabel('Upload: No file uploaded')
@@ -255,16 +257,28 @@ class AquariumLog(QMainWindow):
                 timestamp = int(time.time())
                 storage.child('users').child(userid).child(file +  '-' + str(timestamp) + ext).put(path)
 
-        self.upload_label.setText('Upload: ' + ','.join(files))
+        if files:
+            self.upload_label.setText('Upload: ' + ','.join(files))
+        else:
+            self.upload_label.setText('Upload: No file uploaded')
 
     def load_photo_aquarium(self):
         storage = self.firebase.storage()
         userid = self.user['localId']
         photos = storage.child('users').child(userid).list_files()
         for photo in photos:
-            path_encode = photo.name.replace('/', '%2F')
-            url = self.config['storageBaseUrl'] + self.config['storageBucket'] + '/o/' + path_encode + '?alt=media'
-            self.photo_urls.append(url)
+            file_name = os.path.basename(photo.name)
+            file_path = self.directory + file_name
+            if os.path.isfile(file_path):
+                self.photo_urls.append(file_path)
+            else:
+                path_encode = photo.name.replace('/', '%2F')
+                url = self.config['storageBaseUrl'] + self.config['storageBucket'] + '/o/' + path_encode + '?alt=media'
+                r = requests.get(url)
+                if r.status_code == 200:
+                    with open(file_path, 'wb') as file:
+                        file.write(r.content)
+                self.photo_urls.append(file_path)
 
         if self.photo_urls:
             self.init_slideshow()
@@ -272,9 +286,8 @@ class AquariumLog(QMainWindow):
     def display_slideshow(self):
         if self.slide <= len(self.photo_urls):
             photo_url = self.photo_urls[self.slide]
-            print(photo_url)
             tank_image = QImage()
-            tank_image.loadFromData(requests.get(photo_url).content)
+            tank_image.load(photo_url)
             tank_image_pixmap = QPixmap.fromImage(tank_image.scaled(860,400))
             self.tank_image_container.setPixmap(tank_image_pixmap)
             if self.slide == len(self.photo_urls) -1:

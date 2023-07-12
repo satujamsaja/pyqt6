@@ -1,4 +1,5 @@
 .idea
 AquariumLog/config.yml
 AquariumLog/serviceAccount.json
+AquariumLog/*
 
