@@ -125,6 +125,8 @@ class GraphDialog(QDialog):
     def init_dialog(self):
 
         # Map data
+        index = []
+        num = 0
         date = []
         ph = []
         sg = []
@@ -143,9 +145,11 @@ class GraphDialog(QDialog):
                 kh.append(float(value['kh']))
                 ca.append(float(value['ca']))
                 mg.append(float(value['mg']))
+                num += 1
+                index.append(str(num))
 
         # X labels
-        x_labels = date
+        x_labels = index
 
         # pH Groupbox
         ph_group = QGroupBox('PH')
@@ -153,10 +157,15 @@ class GraphDialog(QDialog):
 
         # pH plot
         plot_ph = self.plot_ph
-        plot_ph.setBackground('w')
         plot_ph.getPlotItem().getAxis('bottom').setStyle(tickTextOffset=15)
         plot_ph.getPlotItem().getAxis('bottom').setTicks([list(enumerate(x_labels))])
         plot_ph.plot(ph, pen='g', symbol='x', symbolPen='g', symbolBrush=0.2, name='PH')
+        ph_top_val = 8.4
+        ph_bottom_val = 8.1
+        ph_top_line = pg.InfiniteLine(pos=ph_top_val, angle=0, movable=False, pen='g')
+        ph_bottom_line = pg.InfiniteLine(pos=ph_bottom_val, angle=0, movable=False, pen='g')
+        plot_ph.addItem(ph_top_line)
+        plot_ph.addItem(ph_bottom_line)
 
         # Plot widget placement
         ph_layout.addWidget(plot_ph)
@@ -168,85 +177,115 @@ class GraphDialog(QDialog):
 
         # sg plot
         plot_sg = self.plot_sg
-        plot_sg.setBackground('w')
         plot_sg.getPlotItem().getAxis('bottom').setStyle(tickTextOffset=15)
         plot_sg.getPlotItem().getAxis('bottom').setTicks([list(enumerate(x_labels))])
         plot_sg.plot(sg, pen='r', symbol='x', symbolPen='r', symbolBrush=0.2, name='SG')
+        sg_top_val = 1.026
+        sg_bottom_val = 1.024
+        sg_top_line = pg.InfiniteLine(pos=sg_top_val, angle=0, movable=False, pen='r')
+        sg_bottom_line = pg.InfiniteLine(pos=sg_bottom_val, angle=0, movable=False, pen='r')
+        plot_sg.addItem(sg_top_line)
+        plot_sg.addItem(sg_bottom_line)
 
         # Plot widget placement
         sg_layout.addWidget(plot_sg)
         sg_group.setLayout(sg_layout)
 
         # no Groupbox
-        no_group = QGroupBox('NO3')
+        no_group = QGroupBox('NO3 in ppm')
         no_layout = QVBoxLayout()
 
         # no plot
         plot_no = self.plot_no
-        plot_no.setBackground('w')
         plot_no.getPlotItem().getAxis('bottom').setStyle(tickTextOffset=15)
         plot_no.getPlotItem().getAxis('bottom').setTicks([list(enumerate(x_labels))])
         plot_no.plot(no, pen='b', symbol='x', symbolPen='b', symbolBrush=0.2, name='NO3')
+        no_top_val = 10
+        no_bottom_val = 0
+        no_top_line = pg.InfiniteLine(pos=no_top_val, angle=0, movable=False, pen='b')
+        no_bottom_line = pg.InfiniteLine(pos=no_bottom_val, angle=0, movable=False, pen='b')
+        plot_no.addItem(no_top_line)
+        plot_no.addItem(no_bottom_line)
 
         # Plot widget placement
         no_layout.addWidget(plot_no)
         no_group.setLayout(no_layout)
 
         # po Groupbox
-        po_group = QGroupBox('PO4')
+        po_group = QGroupBox('PO4 in ppm')
         po_layout = QVBoxLayout()
 
         # no plot
         plot_po = self.plot_po
-        plot_po.setBackground('w')
         plot_po.getPlotItem().getAxis('bottom').setStyle(tickTextOffset=15)
         plot_po.getPlotItem().getAxis('bottom').setTicks([list(enumerate(x_labels))])
-        plot_po.plot(po)
+        plot_po.plot(po, pen='y', symbol='x', symbolPen='y', symbolBrush=0.2, name='PO4')
+        po_top_val = 0
+        po_bottom_val = 0.03
+        po_top_line = pg.InfiniteLine(pos=po_top_val, angle=0, movable=False, pen='y')
+        po_bottom_line = pg.InfiniteLine(pos=po_bottom_val, angle=0, movable=False, pen='y')
+        plot_po.addItem(po_top_line)
+        plot_po.addItem(po_bottom_line)
 
         # Plot widget placement
         po_layout.addWidget(plot_po)
         po_group.setLayout(po_layout)
 
         # kh Groupbox
-        kh_group = QGroupBox('KH')
+        kh_group = QGroupBox('KH in dKH')
         kh_layout = QVBoxLayout()
 
         # no plot
         plot_kh = self.plot_kh
-        plot_kh.setBackground('w')
         plot_kh.getPlotItem().getAxis('bottom').setStyle(tickTextOffset=15)
         plot_kh.getPlotItem().getAxis('bottom').setTicks([list(enumerate(x_labels))])
-        plot_kh.plot(kh)
+        plot_kh.plot(kh, pen='c', symbol='x', symbolPen='c', symbolBrush=0.2, name='KH')
+        kh_top_val = 12
+        kh_bottom_val = 8
+        kh_top_line = pg.InfiniteLine(pos=kh_top_val, angle=0, movable=False, pen='c')
+        kh_bottom_line = pg.InfiniteLine(pos=kh_bottom_val, angle=0, movable=False, pen='c')
+        plot_kh.addItem(kh_top_line)
+        plot_kh.addItem(kh_bottom_line)
 
         # Plot widget placement
         kh_layout.addWidget(plot_kh)
         kh_group.setLayout(kh_layout)
 
         # ca Groupbox
-        ca_group = QGroupBox('CA')
+        ca_group = QGroupBox('CA in ppm')
         ca_layout = QVBoxLayout()
 
         # ca plot
         plot_ca = self.plot_ca
-        plot_ca.setBackground('w')
         plot_ca.getPlotItem().getAxis('bottom').setStyle(tickTextOffset=15)
         plot_ca.getPlotItem().getAxis('bottom').setTicks([list(enumerate(x_labels))])
-        plot_ca.plot(ca)
+        plot_ca.plot(ca, pen='w', symbol='x', symbolPen='w', symbolBrush=0.2, name='CA')
+        ca_top_val = 450
+        ca_bottom_val = 380
+        ca_top_line = pg.InfiniteLine(pos=ca_top_val, angle=0, movable=False, pen='w')
+        ca_bottom_line = pg.InfiniteLine(pos=ca_bottom_val, angle=0, movable=False, pen='w')
+        plot_ca.addItem(ca_top_line)
+        plot_ca.addItem(ca_bottom_line)
 
         # Plot widget placement
         ca_layout.addWidget(plot_ca)
         ca_group.setLayout(ca_layout)
 
         # mg Groupbox
-        mg_group = QGroupBox('MG')
+        mg_group = QGroupBox('MG in ppm')
         mg_layout = QVBoxLayout()
 
         # mg plot
         plot_mg = self.plot_mg
-        plot_mg.setBackground('w')
         plot_mg.getPlotItem().getAxis('bottom').setStyle(tickTextOffset=15)
         plot_mg.getPlotItem().getAxis('bottom').setTicks([list(enumerate(x_labels))])
-        plot_mg.plot(mg)
+        plot_mg.plot(mg, pen='m', symbol='x', symbolPen='m', symbolBrush=0.2, name='MG')
+        mg_top_val = 1400
+        mg_bottom_val = 1200
+        mg_top_line = pg.InfiniteLine(pos=mg_top_val, angle=0, movable=False, pen='m')
+        mg_bottom_line = pg.InfiniteLine(pos=mg_bottom_val, angle=0, movable=False, pen='m')
+        plot_mg.addItem(mg_top_line)
+        plot_mg.addItem(mg_bottom_line)
 
         # Plot widget placement
         mg_layout.addWidget(plot_mg)
