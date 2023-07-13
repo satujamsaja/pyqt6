@@ -1,9 +1,8 @@
 from PyQt6.QtWidgets import (
-    QDialog, QLabel, QGroupBox, QDialogButtonBox, QLineEdit, QFormLayout, QVBoxLayout, QDateTimeEdit, QGridLayout )
+    QDialog, QLabel, QGroupBox, QDialogButtonBox, QLineEdit, QFormLayout, QVBoxLayout, QDateTimeEdit, QGridLayout, QTableWidget, QTableWidgetItem, QHeaderView )
 from PyQt6.QtCore import Qt, QDateTime
 from PyQt6.QtGui import QDoubleValidator
 import pyqtgraph as pg
-import os
 
 class SignInDialog(QDialog):
     def __init__(self):
@@ -104,7 +103,8 @@ class GraphDialog(QDialog):
     def __init__(self, data):
         super().__init__()
         self.setWindowTitle('Aquarium Graph')
-        self.setFixedWidth(1800)
+        self.setFixedWidth(1600)
+        self.setFixedHeight(800)
 
         # Plot
         self.plot_ph = pg.PlotWidget()
@@ -115,6 +115,12 @@ class GraphDialog(QDialog):
         self.plot_ca = pg.PlotWidget()
         self.plot_mg = pg.PlotWidget()
 
+        # Table
+        self.log_table = QTableWidget(1, 8)
+        self.log_table_header = self.log_table.horizontalHeader()
+        self.log_table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.log_table.setHorizontalHeaderLabels(["DATE", "PH", "SG", "NO3", "PO4", "KH", "CA", "MG"])
+
         # Data
         self.data = data
 
@@ -123,7 +129,6 @@ class GraphDialog(QDialog):
 
 
     def init_dialog(self):
-
         # Map data
         index = []
         num = 0
@@ -291,6 +296,27 @@ class GraphDialog(QDialog):
         mg_layout.addWidget(plot_mg)
         mg_group.setLayout(mg_layout)
 
+        # Table layout
+        log_group = QGroupBox('Data reference')
+        log_layout = QVBoxLayout()
+        log_layout.addWidget(self.log_table)
+        log_group.setLayout(log_layout)
+
+        # Load data to table
+        self.log_table.setRowCount(len(self.data))
+        row = 0
+        for log in self.data:
+            log_data = self.data[log]
+            self.log_table.setItem(row, 0, QTableWidgetItem(log_data['date']))
+            self.log_table.setItem(row, 1, QTableWidgetItem(log_data['ph']))
+            self.log_table.setItem(row, 2, QTableWidgetItem(log_data['sg']))
+            self.log_table.setItem(row, 3, QTableWidgetItem(log_data['no']))
+            self.log_table.setItem(row, 4, QTableWidgetItem(log_data['po']))
+            self.log_table.setItem(row, 5, QTableWidgetItem(log_data['kh']))
+            self.log_table.setItem(row, 6, QTableWidgetItem(log_data['ca']))
+            self.log_table.setItem(row, 7, QTableWidgetItem(log_data['mg']))
+            row += 1
+
         # Main layout
         main_layout = QGridLayout()
         main_layout.addWidget(ph_group, 0, 0)
@@ -300,7 +326,8 @@ class GraphDialog(QDialog):
         main_layout.addWidget(kh_group, 1, 0)
         main_layout.addWidget(ca_group, 1, 1)
         main_layout.addWidget(mg_group, 1, 2)
+        main_layout.addWidget(log_group, 1, 3)
         self.setLayout(main_layout)
-        print(self.data)
+
 
 

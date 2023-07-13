@@ -7,13 +7,12 @@ import os
 import time
 import pyrebase
 import requests
-from urllib.parse import quote
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QTableWidget , QTableWidgetItem,
-    QHeaderView, QPushButton, QDialogButtonBox, QMessageBox, QDateTimeEdit, QAbstractItemView, QFileDialog  )
+    QHeaderView, QPushButton, QMessageBox, QFileDialog  )
 
-from PyQt6.QtGui import QIcon, QPixmap, QImage, QDoubleValidator
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtCore import QTimer
 
 from AquariumDialog import SignInDialog, UploadDataDialog, GraphDialog
 
@@ -50,7 +49,7 @@ class AquariumLog(QMainWindow):
         self.log_table = QTableWidget(1, 8)
         self.log_table_header = self.log_table.horizontalHeader()
         self.log_table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.log_table.setHorizontalHeaderLabels(["Date", "pH", "Sg", "NO3", "PO4", "KH", "CA", "MG"])
+        self.log_table.setHorizontalHeaderLabels(["DATE", "PH", "SG", "NO3", "PO4", "KH", "CA", "MG"])
         # Init timer
         self.timer = QTimer()
         # Photo urls holder and slideshow
@@ -58,17 +57,20 @@ class AquariumLog(QMainWindow):
         self.slide = 0
         # Image directory to hold local photos
         self.directory = 'images/'
+        # Data directory to hold json data
+        self.file_data = 'data/data.json'
         # Labels
         self.firebase_label = QLabel('Firebase: Disconnected')
         self.upload_label = QLabel('Upload: No file uploaded')
-        # Load ui
-        self.init_dashboard_ui()
         # Load config
         self.load_config()
         # Init firebase
         self.init_firebase()
+        self.connected = False
         # Hold data
         self.data = []
+        # Load ui
+        self.init_dashboard_ui()
         # Users
         self.user = {}
 
@@ -119,6 +121,10 @@ class AquariumLog(QMainWindow):
         self.setCentralWidget(central_widget)
         self.show()
 
+        # Load data offline
+        self.load_photo_aquarium()
+        self.load_data_aquarium()
+
     def load_config(self):
         with open('config.yml', 'r') as config:
             self.config = yaml.load(config, Loader=yaml.SafeLoader)
@@ -145,8 +151,8 @@ class AquariumLog(QMainWindow):
                 self.sign_in_btn.setVisible(False)
                 self.sign_out_btn.setVisible(True)
                 self.firebase_label.setText('Firebase: Connected')
+                self.connected = True
                 self.load_data_aquarium()
-                self.load_photo_aquarium()
             except requests.exceptions.HTTPError as error:
                 msg = self.error_handler(error)
                 self.display_error(msg)
@@ -185,7 +191,7 @@ class AquariumLog(QMainWindow):
         self.sign_in_btn.setVisible(True)
         self.sign_in_btn.setDisabled(False)
         self.upload_photo_btn.setDisabled(True)
-        self.display_graphics_btn.setDisabled(True)
+        self.display_graphics_btn.setDisabled(False)
         self.upload_data_btn.setDisabled(True)
         self.user = []
         self.timer.stop()
@@ -219,17 +225,31 @@ class AquariumLog(QMainWindow):
                 "ca": ca,
                 "mg": mg
             })
-            self.load_data_aquarium(userid)
+            self.load_data_aquarium()
             self.display_insert_message('Insert data success. Enter another data?')
         except Exception as e:
             print(e)
 
     def load_data_aquarium(self):
-        db = self.firebase.database()
-        userid = self.user['localId']
-        try:
-            data = db.child('users').child(userid).child('data').get()
-            self.data = data.val()
+        if self.connected:
+            db = self.firebase.database()
+            userid = self.user['localId']
+            try:
+                data = db.child('users').child(userid).child('data').get()
+                self.data = data.val()
+                # Write data to json
+                with open(self.file_data, "w") as file:
+                    json.dump(self.data, file)
+
+            except Exception as e:
+                print(e)
+        else:
+            if os.path.isfile(self.file_data):
+                with open(self.file_data, "r") as file:
+                    self.data = json.load(file)
+                    print(self.data)
+
+        if self.data:
             self.log_table.setRowCount(len(self.data))
             row = 0
             for log in self.data:
@@ -244,8 +264,8 @@ class AquariumLog(QMainWindow):
                 self.log_table.setItem(row, 7, QTableWidgetItem(log_data['mg']))
                 row += 1
 
-        except Exception as e:
-            print(e)
+            # Enable display graphics button
+            self.display_graphics_btn.setEnabled(True)
 
     def open_upload_photo_dialog(self):
         paths, _ = QFileDialog.getOpenFileNames(self, 'Select image(s)', '', 'Images (*.png *.jpg *.jpeg)')
@@ -266,22 +286,32 @@ class AquariumLog(QMainWindow):
             self.upload_label.setText('Upload: No file uploaded')
 
     def load_photo_aquarium(self):
-        storage = self.firebase.storage()
-        userid = self.user['localId']
-        photos = storage.child('users').child(userid).list_files()
-        for photo in photos:
-            file_name = os.path.basename(photo.name)
-            file_path = self.directory + file_name
-            if os.path.isfile(file_path):
-                self.photo_urls.append(file_path)
-            else:
-                path_encode = photo.name.replace('/', '%2F')
-                url = self.config['storageBaseUrl'] + self.config['storageBucket'] + '/o/' + path_encode + '?alt=media'
-                r = requests.get(url)
-                if r.status_code == 200:
-                    with open(file_path, 'wb') as file:
-                        file.write(r.content)
-                self.photo_urls.append(file_path)
+        if self.connected:
+            storage = self.firebase.storage()
+            userid = self.user['localId']
+            photos = storage.child('users').child(userid).list_files()
+            if photos:
+                for photo in photos:
+                    file_name = os.path.basename(photo.name)
+                    file_path = self.directory + file_name
+                    if os.path.isfile(file_path):
+                        self.photo_urls.append(file_path)
+                    else:
+                        path_encode = photo.name.replace('/', '%2F')
+                        url = self.config['storageBaseUrl'] + self.config[
+                            'storageBucket'] + '/o/' + path_encode + '?alt=media'
+                        r = requests.get(url)
+                        if r.status_code == 200:
+                            with open(file_path, 'wb') as file:
+                                file.write(r.content)
+                        self.photo_urls.append(file_path)
+        else:
+            photo_files = os.listdir(self.directory)
+            if photo_files:
+                image_extensions = (".jpg", ".jpeg", ".png", ".gif")
+                image_files = [file for file in photo_files if file.lower().endswith(image_extensions)]
+                for image_file in image_files:
+                    self.photo_urls.append(self.directory + image_file)
 
         if self.photo_urls:
             self.init_slideshow()
@@ -303,6 +333,7 @@ class AquariumLog(QMainWindow):
         self.timer.start(3000)
 
     def open_graph_dialog(self):
+        print(self.data)
         graph = GraphDialog(self.data)
         if graph.exec():
             print('called')
