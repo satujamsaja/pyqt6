@@ -39,11 +39,12 @@ class FilesDownloader(QMainWindow):
         self.start_download_btn = QPushButton('Start Download')
         self.stop_download_btn = QPushButton('Stop Download')
         self.save_log_btn = QPushButton('Save Log')
+        self.clean_download_btn = QPushButton('Clean Download')
 
         # Report Label
         self.download_total = QLabel('Total:')
         self.download_success = QLabel('Success:')
-        self.download_fail = QLabel('Fail')
+        self.download_fail = QLabel('Fail:')
 
         # Flag
         self.download_start = False
@@ -89,6 +90,7 @@ class FilesDownloader(QMainWindow):
         action_buttons_layout.addWidget(self.start_download_btn)
         action_buttons_layout.addWidget(self.stop_download_btn)
         action_buttons_layout.addWidget(self.save_log_btn)
+        action_buttons_layout.addWidget(self.clean_download_btn)
         action_buttons_box.setLayout(action_buttons_layout)
 
         # Report box
