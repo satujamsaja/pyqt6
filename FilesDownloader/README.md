@@ -11,8 +11,9 @@ Python app based on PyQT6. This app will download files based on the files list 
 * File integrity check (Upcoming feature - checksum)
 
 # UI
-* TBD
+![UI design](ui.png "UI Design")
 
 # Requirements
 * pyqt6
+
 
