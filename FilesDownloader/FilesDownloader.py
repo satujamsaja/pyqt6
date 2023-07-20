@@ -36,8 +36,7 @@ class FilesDownloader(QMainWindow):
 
         # Actions button
         self.check_link_btn = QPushButton('Check File Links')
-        self.start_download_btn = QPushButton('Start Download')
-        self.stop_download_btn = QPushButton('Stop Download')
+        self.start_download_btn = QPushButton('Start/Stop Download')
         self.save_log_btn = QPushButton('Save Log')
         self.clean_download_btn = QPushButton('Clean Download')
 
@@ -88,7 +87,6 @@ class FilesDownloader(QMainWindow):
         action_buttons_layout = QHBoxLayout()
         action_buttons_layout.addWidget(self.check_link_btn)
         action_buttons_layout.addWidget(self.start_download_btn)
-        action_buttons_layout.addWidget(self.stop_download_btn)
         action_buttons_layout.addWidget(self.save_log_btn)
         action_buttons_layout.addWidget(self.clean_download_btn)
         action_buttons_box.setLayout(action_buttons_layout)
