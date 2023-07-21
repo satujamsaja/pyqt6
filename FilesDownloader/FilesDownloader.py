@@ -1,7 +1,12 @@
 import sys
+import os
+import csv
+import concurrent.futures
+import requests
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QGroupBox, QVBoxLayout, QHBoxLayout, QLabel,
-                             QPushButton, QTableWidget, QHeaderView, QProgressBar)
+                             QPushButton, QTableWidget, QHeaderView, QProgressBar, QFileDialog, QTableWidgetItem)
 
+from PyQt6.QtCore import Qt
 
 class FilesDownloader(QMainWindow):
 
@@ -17,12 +22,23 @@ class FilesDownloader(QMainWindow):
         # Browse Buttons
         self.file_list_browse = QPushButton('Browse file list')
         self.file_list_browse.setFixedHeight(50)
+        self.file_list_browse.clicked.connect(self.open_file_list)
         self.directory_browse = QPushButton('Browse directory target')
         self.directory_browse.setFixedHeight(50)
+        self.directory_browse.clicked.connect(self.open_target_dir)
 
         # Hold file path and folder path
         self.file_list = ''
         self.target_dir = ''
+
+        # Flag
+        self.download_start = False
+
+        # Data
+        self.data = []
+        self.total = 0
+        self.success = 0
+        self.fail = 0
 
         # Table
         self.download_table = QTableWidget(1, 3)
@@ -36,21 +52,27 @@ class FilesDownloader(QMainWindow):
 
         # Actions button
         self.check_link_btn = QPushButton('Check File Links')
+        self.check_link_btn.setDisabled(True)
+        self.check_link_btn.clicked.connect(self.check_file)
         self.start_download_btn = QPushButton('Start/Stop Download')
+        self.start_download_btn.setDisabled(True)
+        self.start_download_btn.clicked.connect(self.start_download)
         self.save_log_btn = QPushButton('Save Log')
+        self.save_log_btn.setDisabled(True)
         self.clean_download_btn = QPushButton('Clean Download')
+        self.clean_download_btn.setDisabled(True)
+        self.clean_download_btn.clicked.connect(self.clean_download)
 
         # Report Label
         self.download_total = QLabel('Total:')
+        self.download_total.setText(f'Total: {self.total}')
         self.download_success = QLabel('Success:')
+        self.download_success.setText(f'Success: {self.success}')
         self.download_fail = QLabel('Fail:')
-
-        # Flag
-        self.download_start = False
+        self.download_fail.setText(f'Fail: {self.fail}')
 
         # Load ui
         self.init_ui()
-        print('aaa')
 
     def init_ui(self):
         downloader_layout = QVBoxLayout()
@@ -113,6 +135,95 @@ class FilesDownloader(QMainWindow):
         central_widget.setLayout(downloader_layout)
         self.setCentralWidget(central_widget)
         self.show()
+
+    def open_file_list(self):
+        paths, _ = QFileDialog.getOpenFileNames(self, 'Select file', '', 'CSV File (*.csv)')
+        if paths:
+            self.file_list = paths[0]
+            self.file_list_path.setText(f'List file: {self.file_list}')
+            self.load_file_list()
+
+    def open_target_dir(self, file):
+        dir = QFileDialog.getExistingDirectory(self, 'Select target directory', options=QFileDialog.Option.ShowDirsOnly)
+        if dir:
+            self.target_dir = dir
+            self.target_dir_path.setText(f'Target directory: {self.target_dir}')
+            if os.access(dir, os.W_OK):
+                self.check_link_btn.setDisabled(False)
+                self.start_download_btn.setDisabled(False)
+                self.save_log_btn.setDisabled(False)
+                self.clean_download_btn.setDisabled(False)
+
+    def load_file_list(self):
+        if self.file_list:
+            file_ext = os.path.splitext(self.file_list)[1]
+            if file_ext == '.csv':
+                with open(self.file_list, 'r') as csv_file:
+                    reader = csv.reader(csv_file)
+                    rows = list(reader)
+                    self.data = rows[1:]
+                    self.total = len(self.data)
+                    self.download_table.setRowCount(self.total)
+                    for index, row in enumerate(self.data):
+                        self.download_table.setItem(index, 0, QTableWidgetItem(row[0]))
+                        self.download_table.setItem(index, 1, QTableWidgetItem(row[1]))
+                        self.download_table.setItem(index, 2, QTableWidgetItem(row[2]))
+                self.download_total.setText(f'Total: {self.total}')
+
+            if self.total > 0 and self.target_dir != '':
+                self.check_link_btn.setDisabled(False)
+                self.start_download_btn.setDisabled(False)
+                self.save_log_btn.setDisabled(False)
+                self.clean_download_btn.setDisabled(False)
+
+    def start_download(self):
+        if self.total > 0:
+            file_urls = []
+            self.success = 0
+            self.fail = 0
+            for row in self.data:
+                save_path = row[0] + '/' + os.path.basename(row[0])
+                file_urls.append(save_path)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                futures = [executor.submit(self.download_file, url, f"{self.target_dir}/{os.path.basename(url)}") for url in file_urls]
+                concurrent.futures.wait(futures)
+
+    def download_file(self, url, save_path):
+        response = requests.get(url, stream=True)
+        if response.status_code == 200:
+            with open(save_path, 'wb') as file:
+                file.write(response.content)
+                self.success += 1
+        else:
+            self.fail += 1
+
+        self.download_success.setText(f'Success: {self.success}')
+        self.download_fail.setText(f'Fail: {self.fail}')
+
+    def check_file(self):
+        if self.data:
+            for row in self.data:
+                url = row[0]
+                response = requests.get(url, stream=True)
+                if response.status_code == 200:
+                    self.success += 1
+                else:
+                    self.fail += 1
+
+        self.download_success.setText(f'Success: {self.success}')
+        self.download_fail.setText(f'Fail: {self.fail}')
+
+    def clean_download(self):
+        for filename in os.listdir(self.target_dir):
+            file_path = os.path.join(self.target_dir, filename)
+            try:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                    print(f'Removed file: {file_path}')
+            except Exception as e:
+                print(f'Failed to remove {file_path}: {e}')
+
 
 
 if __name__ == '__main__':

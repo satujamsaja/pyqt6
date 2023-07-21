@@ -4,7 +4,7 @@ Python app based on PyQT6. This app will download files based on the files list 
 # Features
 * Concurrent download (Upcoming feature)
 * Download any files over http (Upcoming feature - password protected download)
-* Select file list download in csv or json format
+* Select file list download in csv format
 * Reports (success or failed)
 * Select directory target for download
 * Progress bar (Upcoming feature - download progress / overall progress)
