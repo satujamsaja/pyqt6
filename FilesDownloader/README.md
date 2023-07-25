@@ -2,10 +2,10 @@
 Python app based on PyQT6. This app will download files based on the files list in csv/json format
 
 # Features
-* Concurrent download (Upcoming feature)
+* Concurrent download with thread
 * Download any files over http 
 * Select file list download in csv format
-* Reports (success or failed), can be exported as csv
+* Reports can be exported as csv
 * Select directory target for download
 * Progress bar download progress, check links and file deletion
 * File integrity check with md5 hash
