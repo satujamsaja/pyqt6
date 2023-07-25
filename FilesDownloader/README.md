@@ -14,10 +14,10 @@ Python app based on PyQT6. This app will download files based on the files list 
 ![UI design](ui.png "UI Design")
 
 # Demo
-Demo [Video Demo](https://www.youtube.com/watch?v=DV2SD20nhZI)
+[Video Demo](https://www.youtube.com/watch?v=DV2SD20nhZI)
 
 # Requirements
 * pyqt6
 * requests
-* 
+
 
