@@ -1,19 +1,18 @@
 import sys
 import os
 import csv
-import concurrent.futures
-import requests
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QGroupBox, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTableWidget, QHeaderView, QProgressBar, QFileDialog, QTableWidgetItem)
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThreadPool
+from FilesDownloaderThreads import DownloaderThread, DownloadClean
 
 class FilesDownloader(QMainWindow):
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle('Files Downloader')
-        self.setFixedWidth(600)
+        self.setFixedWidth(1000)
 
         # Labels
         self.file_list_path = QLabel('List file:')
@@ -38,13 +37,14 @@ class FilesDownloader(QMainWindow):
         self.data = []
         self.total = 0
         self.success = 0
+        self.progress = 0
         self.fail = 0
 
         # Table
-        self.download_table = QTableWidget(1, 3)
+        self.download_table = QTableWidget(1, 5)
         self.download_table_header = self.download_table.horizontalHeader()
         self.download_table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.download_table.setHorizontalHeaderLabels(["URL", "CHECKSUM", "STATUS"])
+        self.download_table.setHorizontalHeaderLabels(["URL", "CHECKSUM", "PROGRESS", "STATUS", "CODE"])
 
         # Progress bar
         self.download_progress = QProgressBar()
@@ -54,11 +54,12 @@ class FilesDownloader(QMainWindow):
         self.check_link_btn = QPushButton('Check File Links')
         self.check_link_btn.setDisabled(True)
         self.check_link_btn.clicked.connect(self.check_file)
-        self.start_download_btn = QPushButton('Start/Stop Download')
+        self.start_download_btn = QPushButton('Start Download')
         self.start_download_btn.setDisabled(True)
         self.start_download_btn.clicked.connect(self.start_download)
         self.save_log_btn = QPushButton('Save Log')
         self.save_log_btn.setDisabled(True)
+        self.save_log_btn.clicked.connect(self.save_log)
         self.clean_download_btn = QPushButton('Clean Download')
         self.clean_download_btn.setDisabled(True)
         self.clean_download_btn.clicked.connect(self.clean_download)
@@ -166,8 +167,10 @@ class FilesDownloader(QMainWindow):
                     self.download_table.setRowCount(self.total)
                     for index, row in enumerate(self.data):
                         self.download_table.setItem(index, 0, QTableWidgetItem(row[0]))
-                        self.download_table.setItem(index, 1, QTableWidgetItem(row[1]))
-                        self.download_table.setItem(index, 2, QTableWidgetItem(row[2]))
+                        self.download_table.setItem(index, 1, QTableWidgetItem(''))
+                        self.download_table.setItem(index, 2, QTableWidgetItem(''))
+                        self.download_table.setItem(index, 3, QTableWidgetItem(''))
+                        self.download_table.setItem(index, 4, QTableWidgetItem(''))
                 self.download_total.setText(f'Total: {self.total}')
 
             if self.total > 0 and self.target_dir != '':
@@ -177,53 +180,122 @@ class FilesDownloader(QMainWindow):
                 self.clean_download_btn.setDisabled(False)
 
     def start_download(self):
+        self.init_download()
         if self.total > 0:
-            file_urls = []
-            self.success = 0
-            self.fail = 0
-            for row in self.data:
-                save_path = row[0] + '/' + os.path.basename(row[0])
-                file_urls.append(save_path)
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                futures = [executor.submit(self.download_file, url, f"{self.target_dir}/{os.path.basename(url)}") for url in file_urls]
-                concurrent.futures.wait(futures)
-
-    def download_file(self, url, save_path):
-        response = requests.get(url, stream=True)
-        if response.status_code == 200:
-            with open(save_path, 'wb') as file:
-                file.write(response.content)
-                self.success += 1
-        else:
-            self.fail += 1
-
-        self.download_success.setText(f'Success: {self.success}')
-        self.download_fail.setText(f'Fail: {self.fail}')
-
-    def check_file(self):
-        if self.data:
+            file_index = 0
             for row in self.data:
                 url = row[0]
-                response = requests.get(url, stream=True)
-                if response.status_code == 200:
-                    self.success += 1
-                else:
-                    self.fail += 1
+                checksum = row[1]
+                file_name = os.path.basename(row[0])
+                save_path = self.target_dir + '/' + file_name
+                pool = QThreadPool.globalInstance()
+                download_thread = DownloaderThread(file_index, url, save_path, checksum)
+                download_thread.signals.total.connect(self.update_progress_bar)
+                download_thread.signals.success.connect(self.update_success)
+                download_thread.signals.fail.connect(self.update_fail)
+                download_thread.signals.progress.connect(self.update_download_progress)
+                download_thread.signals.checksum.connect(self.update_checksum)
+                pool.start(download_thread)
+                file_index += 1
 
+    def init_download(self):
+        self.success = 0
+        self.fail = 0
+        self.progress = 0
+        self.download_progress.setValue(0)
         self.download_success.setText(f'Success: {self.success}')
         self.download_fail.setText(f'Fail: {self.fail}')
+        for i in range(0, self.total):
+            item_progress = QTableWidgetItem('0%')
+            item_progress.setTextAlignment(Qt.AlignmentFlag.AlignHCenter)
+            self.download_table.setItem(i, 1, QTableWidgetItem(''))
+            self.download_table.setItem(i, 2, item_progress)
+            self.download_table.setItem(i, 3, QTableWidgetItem(''))
+            self.download_table.setItem(i, 4, QTableWidgetItem(''))
+
+    def update_progress_bar(self):
+        self.progress += 1
+        progress = int((self.progress / self.total) * 100)
+        self.download_progress.setValue(progress)
+    def update_success(self, file_index, status_code):
+        self.success += 1
+        self.download_success.setText(f'Success: { self.success }')
+        item_success = QTableWidgetItem('OK')
+        item_success.setTextAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.download_table.setItem(file_index, 3, item_success)
+        item_success_code = QTableWidgetItem(f'{status_code}')
+        item_success_code.setTextAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.download_table.setItem(file_index, 4, item_success_code)
+
+    def update_fail(self, file_index, status_code):
+        self.fail += 1
+        self.download_fail.setText(f'Fail: {self.fail}')
+        item_fail = QTableWidgetItem('FAIL')
+        item_fail.setTextAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.download_table.setItem(file_index, 3, item_fail)
+        item_fail_code = QTableWidgetItem(f'{status_code}')
+        item_fail_code.setTextAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.download_table.setItem(file_index, 4, item_fail_code)
+
+    def update_download_progress(self, file_index, progress):
+        item_progress = QTableWidgetItem('{}%'.format(progress))
+        item_progress.setTextAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.download_table.setItem(file_index, 2, item_progress)
+
+    def update_checksum(self, file_index, valid):
+        item_checksum = QTableWidgetItem('{}'.format('Valid' if valid else 'Invalid'))
+        item_checksum.setTextAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.download_table.setItem(file_index, 1, item_checksum)
+
+    def check_file(self):
+        self.init_download()
+        if self.total > 0:
+            file_index = 0
+            for row in self.data:
+                url = row[0]
+                checksum = row[1]
+                file_name = os.path.basename(row[0])
+                save_path = self.target_dir + '/' + file_name
+                pool = QThreadPool.globalInstance()
+                download_thread = DownloaderThread(file_index, url, save_path, checksum, True)
+                download_thread.signals.total.connect(self.update_progress_bar)
+                download_thread.signals.success.connect(self.update_success)
+                download_thread.signals.fail.connect(self.update_fail)
+                download_thread.signals.progress.connect(self.update_download_progress)
+                pool.start(download_thread)
+                file_index += 1
 
     def clean_download(self):
-        for filename in os.listdir(self.target_dir):
-            file_path = os.path.join(self.target_dir, filename)
-            try:
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-                    print(f'Removed file: {file_path}')
-            except Exception as e:
-                print(f'Failed to remove {file_path}: {e}')
+        self.init_download()
+        if self.total > 0:
+            file_index = 0
+            for row in self.data:
+                file_name = os.path.basename(row[0])
+                save_path = self.target_dir + '/' + file_name
+                pool = QThreadPool.globalInstance()
+                clean_download_thread = DownloadClean(file_index, save_path)
+                clean_download_thread.signals.deleted.connect(self.update_clean_download)
+                clean_download_thread.signals.total.connect(self.update_progress_bar)
+                pool.start(clean_download_thread)
+                file_index += 1
 
+    def update_clean_download(self, file_index, deleted):
+        item_deleted = QTableWidgetItem(deleted)
+        item_deleted.setTextAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.download_table.setItem(file_index, 3, item_deleted)
+
+    def save_log(self):
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
+
+        if file_name:
+            with open(file_name, 'w', newline='') as file:
+                writer = csv.writer(file)
+                header_csv = [self.download_table.horizontalHeaderItem(col).text().lower() for col in range(self.download_table.columnCount())]
+                writer.writerow(header_csv)
+
+                for row in range(self.download_table.rowCount()):
+                    row_data = [self.download_table.item(row, col).text() for col in range(self.download_table.columnCount())]
+                    writer.writerow(row_data)
 
 
 if __name__ == '__main__':
