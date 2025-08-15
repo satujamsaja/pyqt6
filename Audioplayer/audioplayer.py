@@ -3,17 +3,21 @@ from PyQt6.QtCore import Qt, QTimer, QSize
 from PyQt6.QtGui import QIcon
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3
+from audiovisualizer import AudioVisualizer
 import pygame
+from pydub import AudioSegment
+import numpy as np
 
 class AudioPlayer(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Audio Player")
-        self.setGeometry(100, 100, 555, 600)
+        self.setWindowTitle("Satujamsaja Audio Player")
+        self.setGeometry(100, 100, 555, 800)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         # Define open audio file button
         self.open_button = QPushButton("Open Audio File")
         # Define playlist and current track
-        self.playlist = QTableWidget(1, 4)
+        self.playlist = QTableWidget(1, 5)
         # Define track progress bar
         self.track_progress = QProgressBar()
         self.track_progress.setMinimum(0)
@@ -55,6 +59,9 @@ class AudioPlayer(QMainWindow):
         # Connect volume slider to a method (placeholder)
         self.volume_slider.valueChanged.connect(self.adjust_volume)
 
+        # Load visualization
+        self.visualizer = AudioVisualizer()
+
         # Load ui
         self.init_ui()
 
@@ -64,6 +71,7 @@ class AudioPlayer(QMainWindow):
     def init_ui(self):
         # Section for layout
         file_section = QGroupBox('File')
+        visualization_section = QGroupBox('Spectrum Visualization')
         playlist_section = QGroupBox('Playlist')
         control_section = QGroupBox('Audio Controls')
         track_progess_section = QGroupBox('Track Progress')
@@ -73,6 +81,11 @@ class AudioPlayer(QMainWindow):
         file_layout = QVBoxLayout()
         file_layout.addWidget(self.open_button)
         file_section.setLayout(file_layout)
+
+        # Set layout for visualization section
+        visualization_layout = QVBoxLayout()
+        visualization_layout.addWidget(self.visualizer)
+        visualization_section.setLayout(visualization_layout)
 
         # Set layout for playlist section
         playlist_layout = QVBoxLayout()
@@ -100,6 +113,7 @@ class AudioPlayer(QMainWindow):
         # Main layout
         main_layout = QVBoxLayout()
         main_layout.addWidget(file_section)
+        main_layout.addWidget(visualization_section)
         main_layout.addWidget(playlist_section)
         main_layout.addWidget(control_section)
         main_layout.addWidget(track_progess_section)
@@ -216,6 +230,11 @@ class AudioPlayer(QMainWindow):
             }
         except Exception as e:
             print(f"Error reading ID3 tags: {e}")
+            tag_info = {
+                'title': 'Unknown Title',
+                'artist': 'Unknown Artist',
+                'album': 'Unknown Album',
+            }
 
         # Add the selected file to the playlist
         row_position = self.playlist.rowCount()
@@ -244,6 +263,11 @@ class AudioPlayer(QMainWindow):
             self.track_progress.setMaximum(0)
             self.track_progress.setValue(0)
             print(f"Error loading track: {e}")
+        # Display visualization
+        self.audio_segment = AudioSegment.from_mp3(track_path)
+        self.frame_rate = self.audio_segment.frame_rate
+        self.channels = self.audio_segment.channels
+        self.samples = np.array(self.audio_segment.get_array_of_samples())
 
     def update_track_progress(self):
         pos_ms = pygame.mixer.music.get_pos()
@@ -255,6 +279,12 @@ class AudioPlayer(QMainWindow):
             return
         pos_sec = pos_ms // 1000
         self.track_progress.setValue(pos_sec)
+        # Visualization
+        if hasattr(self, 'samples'):
+            start = int((pos_ms / 1000) * self.frame_rate) * self.channels
+            end = start + 2048
+            frame = self.samples[start:end] if end < len(self.samples) else self.samples[-2048:]
+            self.visualizer.update_spectrum(frame)
 
 if __name__ == "__main__":
     app = QApplication([])

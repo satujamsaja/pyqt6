@@ -4,6 +4,7 @@ Python app based on PyQT6. This app is audio player support mp3 format at this t
 # Features
 - Select multiple mp3 files
 - Loop play
+- Spectrum visualizer
 
 
 # UI 
@@ -13,4 +14,8 @@ Python app based on PyQT6. This app is audio player support mp3 format at this t
 - pyqt6
 - pygame
 - mutagen
+- pydub
+- numpy
+
+
 
